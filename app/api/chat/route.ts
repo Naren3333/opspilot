@@ -8,6 +8,7 @@ const requestSchema = z.object({
   workspaceSlug: z.string().min(1),
   conversationId: z.string().optional(),
   message: z.string().min(1),
+  documentIds: z.array(z.string()).optional(),
 });
 
 export async function POST(request: Request) {
@@ -22,7 +23,12 @@ export async function POST(request: Request) {
         let responseText = "";
 
         try {
-          for await (const chunk of setup.provider.streamChat(setup.providerMessages)) {
+          const stream =
+            setup.provider.name === "mock" && setup.demoResponse
+              ? setup.demoResponse.split(/(\s+)/).filter(Boolean)
+              : setup.provider.streamChat(setup.providerMessages);
+
+          for await (const chunk of stream) {
             responseText += chunk;
             controller.enqueue(encoder.encode(`${JSON.stringify({ type: "chunk", content: chunk })}\n`));
           }
@@ -47,6 +53,8 @@ export async function POST(request: Request) {
           encoder.encode(
             `${JSON.stringify({
               type: "meta",
+              conversationId: setup.conversation.id,
+              conversationTitle: setup.conversation.title,
               citations: finalized.run?.citations ?? setup.citations,
               approvals: finalized.approvals,
               toolActions: finalized.proposals,

@@ -171,6 +171,16 @@ export async function listDocuments(slug: string) {
   return [...(snapshot?.documents ?? [])].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
 }
 
+export async function getDocumentsByIds(slug: string, documentIds: string[]) {
+  const snapshot = await getWorkspaceSnapshot(slug);
+  if (!snapshot || documentIds.length === 0) {
+    return [];
+  }
+
+  const ids = new Set(documentIds);
+  return snapshot.documents.filter((document) => ids.has(document.id));
+}
+
 export async function listApprovals(slug: string) {
   const snapshot = await getWorkspaceSnapshot(slug);
   return [...(snapshot?.approvals ?? [])].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
@@ -305,25 +315,63 @@ export async function saveProviderSettings(slug: string, settings: ProviderSetti
   return snapshot.providerSettings;
 }
 
-export async function searchKnowledgeBase(slug: string, query: string) {
+export async function searchKnowledgeBase(
+  slug: string,
+  query: string,
+  options?: {
+    documentIds?: string[];
+  },
+) {
   const snapshot = await getWorkspaceSnapshot(slug);
   if (!snapshot) return [];
 
-  const documentHits = snapshot.documentChunks
+  const selectedIds = new Set(options?.documentIds ?? []);
+  const scopedChunks = selectedIds.size
+    ? snapshot.documentChunks.filter((chunk) => selectedIds.has(chunk.documentId))
+    : snapshot.documentChunks;
+
+  const documentHits = scopedChunks
     .map((chunk) => ({
       citation: {
         id: createId("citation"),
         sourceType: "document" as const,
         sourceId: chunk.documentId,
         label: chunk.title,
-        excerpt: chunk.content.slice(0, 220),
+        excerpt: chunk.content.slice(0, 360),
         score: scoreText(query, `${chunk.title} ${chunk.content}`),
       },
       keywords: query.split(/\W+/).filter(Boolean),
     }))
-    .filter((hit) => hit.citation.score > 0)
+    .filter((hit) => selectedIds.size || hit.citation.score > 0)
     .sort((a, b) => b.citation.score - a.citation.score)
-    .slice(0, 3);
+    .slice(0, selectedIds.size ? 6 : 3);
+
+  if (selectedIds.size) {
+    const fallbackDocumentHits = snapshot.documents
+      .filter((document) => selectedIds.has(document.id))
+      .map((document) => ({
+        citation: {
+          id: createId("citation"),
+          sourceType: "document" as const,
+          sourceId: document.id,
+          label: document.sourcePath ?? document.title,
+          excerpt: document.rawText.slice(0, 360),
+          score: 0.35,
+        },
+        keywords: [],
+      }));
+
+    const mergedDocumentHits = [...documentHits];
+    for (const fallbackHit of fallbackDocumentHits) {
+      if (!mergedDocumentHits.some((hit) => hit.citation.sourceId === fallbackHit.citation.sourceId)) {
+        mergedDocumentHits.push(fallbackHit);
+      }
+    }
+
+    return mergedDocumentHits
+      .sort((a, b) => b.citation.score - a.citation.score)
+      .slice(0, Math.max(2, selectedIds.size * 2));
+  }
 
   const ticketHits = snapshot.tickets
     .map((ticket) => ({

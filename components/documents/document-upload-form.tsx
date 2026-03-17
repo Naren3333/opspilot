@@ -58,7 +58,7 @@ export function DocumentUploadForm({ workspaceSlug }: { workspaceSlug: string })
         <input
           name="file"
           type="file"
-          accept=".pdf,.md,.txt"
+          accept=".c,.cpp,.css,.go,.html,.java,.js,.json,.jsx,.kt,.md,.mjs,.pdf,.php,.py,.rb,.rs,.sh,.sql,.swift,.ts,.tsx,.txt,.yaml,.yml"
           className="w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3"
         />
         <button
@@ -69,7 +69,10 @@ export function DocumentUploadForm({ workspaceSlug }: { workspaceSlug: string })
           {busy ? "Working..." : "Upload and index"}
         </button>
       </div>
-      {status ? <p className="mt-3 text-sm text-[var(--muted)]">{status}</p> : null}
+      <p className="mt-3 text-sm text-[var(--muted)]">
+        Upload docs, config, or code files to make them searchable in review threads.
+      </p>
+      {status ? <p className="mt-2 text-sm text-[var(--muted)]">{status}</p> : null}
     </form>
   );
 }

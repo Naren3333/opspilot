@@ -59,6 +59,52 @@ const members: WorkspaceMember[] = [
 
 const documents: DocumentRecord[] = [
   {
+    id: "doc_review_api",
+    workspaceId: workspace.id,
+    title: "review-api.ts",
+    format: "txt",
+    summary:
+      "API handler draft for a review endpoint with debug logging, any-typed payloads, and a hardcoded token.",
+    status: "indexed",
+    sourcePath: "app/api/review-api.ts",
+    rawText: `export async function POST(request: Request) {
+  const payload: any = await request.json();
+  const serviceToken = "sk-demo-token-123456789";
+  console.log("incoming review payload", payload);
+
+  if (!payload.files?.length) {
+    return Response.json({ error: "No files submitted." }, { status: 400 });
+  }
+
+  return Response.json({ ok: true, token: serviceToken });
+}`,
+    chunkCount: 0,
+    createdAt: "2026-03-17T07:00:00.000Z",
+    updatedAt: "2026-03-17T07:00:00.000Z",
+  },
+  {
+    id: "doc_review_panel",
+    workspaceId: workspace.id,
+    title: "review-panel.tsx",
+    format: "txt",
+    summary:
+      "Review panel component prototype that renders HTML directly and suppresses TypeScript checks.",
+    status: "indexed",
+    sourcePath: "components/review-panel.tsx",
+    rawText: `// @ts-ignore
+export function ReviewPanel({ html, onOpen }: { html: string; onOpen: any }) {
+  return (
+    <section>
+      <button onClick={() => onOpen(Math.random())}>Open review</button>
+      <div dangerouslySetInnerHTML={{ __html: html }} />
+    </section>
+  );
+}`,
+    chunkCount: 0,
+    createdAt: "2026-03-17T07:10:00.000Z",
+    updatedAt: "2026-03-17T07:10:00.000Z",
+  },
+  {
     id: "doc_billing",
     workspaceId: workspace.id,
     title: "Billing and refunds handbook",
@@ -188,6 +234,13 @@ const conversations: Conversation[] = [
     createdAt: "2026-03-16T08:00:00.000Z",
     updatedAt: "2026-03-16T08:40:00.000Z",
   },
+  {
+    id: "conversation_2",
+    workspaceId: workspace.id,
+    title: "Review webhook patch",
+    createdAt: "2026-03-17T07:20:00.000Z",
+    updatedAt: "2026-03-17T07:24:00.000Z",
+  },
 ];
 
 const messages: MessageRecord[] = [
@@ -227,14 +280,76 @@ const messages: MessageRecord[] = [
     ],
     createdAt: "2026-03-16T08:11:00.000Z",
   },
+  {
+    id: "message_3",
+    conversationId: "conversation_2",
+    workspaceId: workspace.id,
+    role: "user",
+    content: "Review the submitted files like a PR review and call out the highest-risk issues first.",
+    citations: [],
+    createdAt: "2026-03-17T07:21:00.000Z",
+  },
+  {
+    id: "message_4",
+    conversationId: "conversation_2",
+    workspaceId: workspace.id,
+    role: "assistant",
+    content:
+      "Findings: 1. HIGH - `app/api/review-api.ts:3` returns a hardcoded token in the response body, which would leak a credential. 2. HIGH - `components/review-panel.tsx:5` uses `dangerouslySetInnerHTML` with a raw `html` prop, so untrusted content can become an XSS path. 3. MEDIUM - both files use broad type escapes or weak randomness, so the happy path may pass while bad input still slips through.",
+    citations: [
+      {
+        id: "citation_3",
+        sourceType: "document",
+        sourceId: "doc_review_api",
+        label: "app/api/review-api.ts",
+        excerpt: 'const serviceToken = "sk-demo-token-123456789";',
+        score: 0.97,
+      },
+      {
+        id: "citation_4",
+        sourceType: "document",
+        sourceId: "doc_review_panel",
+        label: "components/review-panel.tsx",
+        excerpt: "<div dangerouslySetInnerHTML={{ __html: html }} />",
+        score: 0.95,
+      },
+    ],
+    createdAt: "2026-03-17T07:24:00.000Z",
+  },
 ];
 
 const agentRuns: AgentRun[] = [
   {
+    id: "run_2",
+    workspaceId: workspace.id,
+    conversationId: "conversation_2",
+    promptVersion: "2026-03-17.v2",
+    status: "completed",
+    provider: "mock",
+    model: "demo-reviewer",
+    latencyMs: 1880,
+    prompt: "Review the submitted files like a PR review and call out the highest-risk issues first.",
+    response:
+      "Findings: 1. HIGH - `app/api/review-api.ts:3` returns a hardcoded token in the response body, which would leak a credential. 2. HIGH - `components/review-panel.tsx:5` uses `dangerouslySetInnerHTML` with a raw `html` prop, so untrusted content can become an XSS path. 3. MEDIUM - both files use broad type escapes or weak randomness, so the happy path may pass while bad input still slips through.",
+    citations: [
+      {
+        id: "citation_3",
+        sourceType: "document",
+        sourceId: "doc_review_api",
+        label: "app/api/review-api.ts",
+        excerpt: 'const serviceToken = "sk-demo-token-123456789";',
+        score: 0.97,
+      },
+    ],
+    toolActions: [],
+    createdAt: "2026-03-17T07:24:00.000Z",
+    completedAt: "2026-03-17T07:24:02.000Z",
+  },
+  {
     id: "run_1",
     workspaceId: workspace.id,
     conversationId: "conversation_1",
-    promptVersion: "2026-03-17.v1",
+    promptVersion: "2026-03-17.v2",
     status: "awaiting_approval",
     provider: "mock",
     model: "demo-narrator",

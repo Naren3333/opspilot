@@ -219,12 +219,14 @@ export interface ChatRequest {
   workspaceSlug: string;
   conversationId?: string;
   message: string;
+  documentIds?: string[];
 }
 
 export interface ChatEnvelope {
   type: "chunk" | "meta" | "error" | "done";
   content?: string;
   conversationId?: string;
+  conversationTitle?: string;
   runId?: string;
   citations?: Citation[];
   approvals?: ApprovalRequest[];
