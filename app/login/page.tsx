@@ -3,7 +3,13 @@ import { ArrowRight } from "lucide-react";
 import { LoginForm } from "@/components/login/login-form";
 import { env } from "@/lib/env";
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ message?: string }>;
+}) {
+  const { message } = await searchParams;
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl items-center px-6 py-10 md:px-10">
       <div className="grid w-full gap-8 lg:grid-cols-[1.25fr_0.95fr]">
@@ -13,8 +19,8 @@ export default function LoginPage() {
             Step into the support war room with guardrails already on.
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-8 text-[var(--muted)]">
-            Use Supabase magic links for the real app flow, or jump into the seeded demo workspace
-            while you connect your own stack.
+            Use Supabase OAuth or magic links for the real app flow, or jump into the seeded demo
+            workspace while you connect your own stack.
           </p>
 
           <div className="mt-8 grid gap-4 md:grid-cols-2">
@@ -34,7 +40,10 @@ export default function LoginPage() {
           </div>
         </section>
 
-        <LoginForm demoHref={`/w/${env.demoWorkspaceSlug}/chat`} />
+        <LoginForm
+          demoHref={`/w/${env.demoWorkspaceSlug}/chat`}
+          initialMessage={message}
+        />
       </div>
     </main>
   );
