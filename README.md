@@ -82,9 +82,27 @@ Apply the migration and optional seed:
 
 The migration creates the workspace, ticketing, agent trace, approval, eval, and audit tables, plus row-level security helpers.
 
+## OAuth login setup
+
+OpsPilot's `/login` page supports GitHub, Google, and magic-link sign-in through Supabase Auth.
+
+1. In your Supabase project, open `Authentication -> Providers`.
+2. Enable `GitHub` and/or `Google`.
+3. Add these redirect URLs:
+
+```text
+http://localhost:3000/auth/callback
+https://your-production-domain.com/auth/callback
+```
+
+4. Set your Supabase site URL to your local or deployed app URL.
+5. Make sure `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `NEXT_PUBLIC_APP_URL` are set in `.env.local`.
+
+If the providers are not enabled yet, the OAuth buttons still render but Supabase will reject the sign-in attempt until the provider credentials are configured.
+
 ## What is implemented
 
-- `/login` with magic-link flow and a demo bypass
+- `/login` with GitHub, Google, magic-link flow, and a demo bypass
 - `/onboarding` workspace creation
 - `/w/[slug]/chat` streaming AI chat over seeded support data
 - `/w/[slug]/tickets` and `/w/[slug]/tickets/[id]`

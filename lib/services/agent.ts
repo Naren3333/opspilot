@@ -5,6 +5,7 @@ import {
   createApprovalsForRun,
   createConversation,
   getConversationMessages,
+  getDocumentsByIds,
   getProviderSettings,
   getWorkspaceSnapshot,
   listTickets,
@@ -14,15 +15,23 @@ import {
 import { getModelProvider } from "@/lib/providers";
 import type { ProviderMessage } from "@/lib/providers/types";
 import { OPSPILOT_PROMPT_VERSION, buildSystemPrompt } from "@/lib/prompts";
+import {
+  buildConversationTitle,
+  buildDemoReviewResponse,
+  isReviewRequest,
+} from "@/lib/services/reviewer";
 import type { ChatRequest, Citation, ToolActionProposal } from "@/lib/types";
 
-function buildContext(citations: Citation[]) {
+function buildContext(citations: Citation[], mode: "support" | "review") {
   if (!citations.length) {
-    return "Context: No direct matches were retrieved. Answer carefully and say when more documentation is needed.";
+    return mode === "review"
+      ? "Review context: No direct file excerpts were retrieved. Ask for more files or narrow the review target."
+      : "Context: No direct matches were retrieved. Answer carefully and say when more documentation is needed.";
   }
 
+  const heading = mode === "review" ? "Review context:" : "Context:";
   return [
-    "Context:",
+    heading,
     ...citations.map(
       (citation, index) =>
         `${index + 1}. [${citation.label}] ${citation.excerpt} (score ${citation.score.toFixed(2)})`,
@@ -120,12 +129,23 @@ async function inferToolProposals(workspaceSlug: string, runId: string, message:
   return proposals;
 }
 
-function buildFallbackResponse(message: string, citations: Citation[]) {
-  const evidence = citations[0]?.excerpt
-    ? `Most relevant evidence: ${citations[0].excerpt}`
+function buildFallbackResponse(input: {
+  message: string;
+  citations: Citation[];
+  mode: "support" | "review";
+}) {
+  if (input.mode === "review") {
+    const evidence = input.citations[0]?.excerpt
+      ? `Most relevant snippet: ${input.citations[0].excerpt}`
+      : "No matching file excerpt was retrieved.";
+    return `I prepared a review-oriented fallback for "${input.message}". ${evidence}`;
+  }
+
+  const evidence = input.citations[0]?.excerpt
+    ? `Most relevant evidence: ${input.citations[0].excerpt}`
     : "No strong evidence was found in the workspace yet.";
 
-  return `Here is a grounded summary for "${message}": ${evidence}`;
+  return `Here is a grounded summary for "${input.message}": ${evidence}`;
 }
 
 export async function initializeChatRun(request: ChatRequest) {
@@ -134,10 +154,16 @@ export async function initializeChatRun(request: ChatRequest) {
     throw new Error("Workspace not found.");
   }
 
+  const selectedDocuments = await getDocumentsByIds(request.workspaceSlug, request.documentIds ?? []);
+  const mode = isReviewRequest(request.message, request.documentIds) ? "review" : "support";
   const conversation =
     (request.conversationId
       ? snapshot.conversations.find((item) => item.id === request.conversationId)
-      : null) ?? (await createConversation(request.workspaceSlug, "New queue analysis"));
+      : null) ??
+    (await createConversation(
+      request.workspaceSlug,
+      buildConversationTitle(request.message, selectedDocuments),
+    ));
 
   await appendMessage({
     conversationId: conversation.id,
@@ -146,14 +172,19 @@ export async function initializeChatRun(request: ChatRequest) {
     content: request.message,
   });
 
-  const citations = (await searchKnowledgeBase(request.workspaceSlug, request.message)).map((item) => item.citation);
+  const citations = (
+    await searchKnowledgeBase(request.workspaceSlug, request.message, {
+      documentIds: request.documentIds,
+    })
+  ).map((item) => item.citation);
+
   const settings = await getProviderSettings(request.workspaceSlug);
   const provider = getModelProvider(settings);
   const priorMessages = await getConversationMessages(conversation.id);
   const providerMessages: ProviderMessage[] = [
     {
       role: "system",
-      content: `${buildSystemPrompt()}\n${buildContext(citations)}`,
+      content: `${buildSystemPrompt(mode)}\n${buildContext(citations, mode)}`,
     },
     ...priorMessages.slice(-6).map((message) => ({
       role: message.role,
@@ -175,6 +206,15 @@ export async function initializeChatRun(request: ChatRequest) {
     toolActions: [],
   });
 
+  const demoResponse =
+    mode === "review"
+      ? buildDemoReviewResponse({
+          message: request.message,
+          documents: selectedDocuments,
+          citations,
+        })
+      : null;
+
   return {
     workspace: snapshot.workspace,
     conversation,
@@ -182,7 +222,12 @@ export async function initializeChatRun(request: ChatRequest) {
     citations,
     provider,
     providerMessages,
-    fallbackText: buildFallbackResponse(request.message, citations),
+    fallbackText: buildFallbackResponse({
+      message: request.message,
+      citations,
+      mode,
+    }),
+    demoResponse,
   };
 }
 

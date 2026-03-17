@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #04070d;
-  --foreground: #edf4ff;
-  --card: rgba(8, 14, 24, 0.74);
-  --card-strong: rgba(11, 18, 30, 0.94);
-  --muted: #8493aa;
-  --line: rgba(133, 158, 193, 0.18);
-  --accent: #85f7d9;
-  --accent-soft: rgba(133, 247, 217, 0.14);
-  --accent-ink: #061e18;
-  --secondary: #ff8658;
-  --secondary-soft: rgba(255, 134, 88, 0.14);
+  --background: #05070c;
+  --foreground: #edf3fb;
+  --card: rgba(9, 12, 19, 0.82);
+  --card-strong: rgba(10, 14, 22, 0.96);
+  --muted: #8a96aa;
+  --line: rgba(146, 163, 190, 0.16);
+  --accent: #7af5df;
+  --accent-soft: rgba(122, 245, 223, 0.12);
+  --accent-ink: #06131a;
+  --secondary: #81b4ff;
+  --secondary-soft: rgba(129, 180, 255, 0.14);
   --success: #71f0a5;
   --warning: #ffc96b;
   --danger: #ff6d85;
-  --shadow: 0 32px 120px rgba(0, 0, 0, 0.46);
+  --shadow: 0 28px 120px rgba(0, 0, 0, 0.42);
 }
 
 @theme inline {
@@ -37,10 +37,10 @@ body {
   position: relative;
   min-height: 100vh;
   background:
-    radial-gradient(circle at top left, rgba(133, 247, 217, 0.18), transparent 24%),
-    radial-gradient(circle at 85% 10%, rgba(255, 134, 88, 0.16), transparent 28%),
-    radial-gradient(circle at 30% 120%, rgba(99, 145, 255, 0.12), transparent 24%),
-    linear-gradient(180deg, #090d14 0%, #020309 100%);
+    radial-gradient(circle at top left, rgba(122, 245, 223, 0.12), transparent 24%),
+    radial-gradient(circle at 88% 12%, rgba(129, 180, 255, 0.14), transparent 28%),
+    radial-gradient(circle at 34% 120%, rgba(86, 113, 255, 0.09), transparent 24%),
+    linear-gradient(180deg, #070a11 0%, #020309 100%);
   color: var(--foreground);
   font-family: var(--font-space-grotesk), sans-serif;
   overflow-x: hidden;
@@ -51,12 +51,12 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 72px 72px;
-  mask-image: radial-gradient(circle at center, black 28%, transparent 88%);
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 58px 58px;
+  mask-image: radial-gradient(circle at center, black 22%, transparent 84%);
   pointer-events: none;
-  opacity: 0.22;
+  opacity: 0.18;
 }
 
 body::after {
@@ -65,8 +65,8 @@ body::after {
   inset: auto -20vw -28vh auto;
   width: 46vw;
   height: 46vw;
-  background: radial-gradient(circle, rgba(133, 247, 217, 0.14), transparent 68%);
-  filter: blur(36px);
+  background: radial-gradient(circle, rgba(129, 180, 255, 0.12), transparent 68%);
+  filter: blur(42px);
   pointer-events: none;
 }
 
@@ -83,7 +83,7 @@ select {
 }
 
 ::selection {
-  background: rgba(133, 247, 217, 0.22);
+  background: rgba(129, 180, 255, 0.24);
 }
 
 ::-webkit-scrollbar {
@@ -98,6 +98,6 @@ select {
 ::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(133, 247, 217, 0.52), rgba(255, 134, 88, 0.52));
+  background: linear-gradient(180deg, rgba(122, 245, 223, 0.42), rgba(129, 180, 255, 0.42));
   background-clip: padding-box;
 }

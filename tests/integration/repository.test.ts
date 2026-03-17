@@ -3,6 +3,7 @@ import {
   createConversation,
   decideApproval,
   drainQueuedDocuments,
+  searchKnowledgeBase,
   getWorkspaceSnapshot,
   queueDocument,
 } from "@/lib/data/repository";
@@ -61,5 +62,25 @@ describe("demo repository flows", () => {
     expect(updatedSnapshot?.tickets.find((ticket) => ticket.id === "ticket_102")?.assignee).toBe(
       "Platform On-call",
     );
+  });
+
+  it("keeps review retrieval scoped to the selected uploaded files", async () => {
+    const document = await queueDocument({
+      workspaceSlug: "northstar-support",
+      title: "auth-review.ts",
+      format: "txt",
+      rawText: 'const token = "sk-demo-123456789";\nconsole.log(token);\n',
+      sourcePath: "auth-review.ts",
+    });
+
+    await drainQueuedDocuments("northstar-support");
+
+    const hits = await searchKnowledgeBase("northstar-support", "review these files", {
+      documentIds: [document.id],
+    });
+
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.every((hit) => hit.citation.sourceType === "document")).toBe(true);
+    expect(hits.some((hit) => hit.citation.sourceId === document.id)).toBe(true);
   });
 });
