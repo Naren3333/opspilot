@@ -3,9 +3,11 @@ import {
   createConversation,
   decideApproval,
   drainQueuedDocuments,
+  getConversationById,
   searchKnowledgeBase,
   getWorkspaceSnapshot,
   queueDocument,
+  updateConversationContext,
 } from "@/lib/data/repository";
 import { resetDemoStore } from "@/lib/data/demo-store";
 
@@ -82,5 +84,16 @@ describe("demo repository flows", () => {
     expect(hits.length).toBeGreaterThan(0);
     expect(hits.every((hit) => hit.citation.sourceType === "document")).toBe(true);
     expect(hits.some((hit) => hit.citation.sourceId === document.id)).toBe(true);
+  });
+
+  it("stores file context per conversation", async () => {
+    const conversation = await createConversation("northstar-support", "Context memory", {
+      contextDocumentIds: ["doc_review_api"],
+    });
+
+    await updateConversationContext(conversation.id, ["doc_review_panel", "doc_status"]);
+    const updatedConversation = await getConversationById(conversation.id);
+
+    expect(updatedConversation?.contextDocumentIds).toEqual(["doc_review_panel", "doc_status"]);
   });
 });

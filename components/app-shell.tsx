@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   Bot,
@@ -8,6 +9,8 @@ import {
   ClipboardCheck,
   FileSearch,
   FlaskConical,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Ticket,
 } from "lucide-react";
@@ -24,6 +27,8 @@ const navItems = [
   { label: "Providers", href: "settings/providers", icon: Settings },
 ];
 
+const STORAGE_KEY = "opspilot-shell-collapsed";
+
 export function AppShell({
   slug,
   workspaceName,
@@ -38,17 +43,51 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(
+    () => typeof window !== "undefined" && window.localStorage.getItem(STORAGE_KEY) === "1",
+  );
+
+  function toggleCollapsed() {
+    setCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem(STORAGE_KEY, next ? "1" : "0");
+      return next;
+    });
+  }
 
   return (
-    <div className="mx-auto flex min-h-screen w-full max-w-[1680px] gap-0 px-0">
-      <aside className="hidden w-[15.5rem] shrink-0 border-r border-[var(--line)] bg-[rgba(8,10,15,0.9)] xl:flex xl:flex-col">
-        <div className="px-5 pb-4 pt-6">
-          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-[var(--muted)]">OpsPilot</p>
-          <p className="mt-4 truncate text-base font-semibold text-[var(--foreground)]">{workspaceName}</p>
-          <p className="mt-1 text-sm text-[var(--muted)]">{role}</p>
+    <div className="mx-auto flex min-h-screen w-full max-w-[1760px] gap-0 px-0">
+      <aside
+        className={cn(
+          "hidden shrink-0 border-r border-[var(--line)] bg-[rgba(8,10,15,0.9)] transition-[width] duration-200 xl:flex xl:flex-col",
+          collapsed ? "w-[4.5rem]" : "w-[15.5rem]",
+        )}
+      >
+        <div
+          className={cn(
+            "flex items-center border-b border-[var(--line)] px-3 py-4",
+            collapsed ? "justify-center" : "justify-between",
+          )}
+        >
+          {!collapsed ? (
+            <div className="min-w-0">
+              <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-[var(--muted)]">OpsPilot</p>
+              <p className="mt-3 truncate text-base font-semibold text-[var(--foreground)]">{workspaceName}</p>
+              <p className="mt-1 text-sm text-[var(--muted)]">{role}</p>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-[var(--muted)] transition hover:bg-[rgba(255,255,255,0.04)] hover:text-[var(--foreground)]"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 pb-5">
+        <nav className="flex-1 space-y-1 px-2 py-3">
           {navItems.map((item) => {
             const href = `/w/${slug}/${item.href}`;
             const active = pathname === href;
@@ -59,17 +98,19 @@ export function AppShell({
                 key={item.href}
                 href={href}
                 className={cn(
-                  "flex items-center justify-between rounded-xl px-3 py-2.5 text-sm transition",
+                  "flex items-center rounded-xl px-3 py-2.5 text-sm transition",
+                  collapsed ? "justify-center" : "justify-between",
                   active
                     ? "bg-[rgba(255,255,255,0.06)] text-[var(--foreground)]"
                     : "text-[var(--muted)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--foreground)]",
                 )}
+                title={collapsed ? item.label : undefined}
               >
-                <span className="flex items-center gap-3">
+                <span className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
                   <Icon size={16} className={active ? "text-[var(--foreground)]" : "text-[var(--muted)]"} />
-                  {item.label}
+                  {!collapsed ? <span>{item.label}</span> : null}
                 </span>
-                {item.href === "approvals" && pendingApprovals > 0 ? (
+                {!collapsed && item.href === "approvals" && pendingApprovals > 0 ? (
                   <span className="rounded-full bg-[rgba(255,194,107,0.12)] px-2 py-0.5 text-[11px] text-[var(--warning)]">
                     {pendingApprovals}
                   </span>

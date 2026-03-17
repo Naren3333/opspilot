@@ -33,6 +33,7 @@ export default async function ChatPage({
         workspaceSlug={slug}
         initialConversationId={activeConversation?.id ?? null}
         initialConversationTitle={activeConversation?.title ?? null}
+        initialSelectedDocumentIds={activeConversation?.contextDocumentIds ?? []}
         initialConversations={conversations}
         initialDocuments={documents}
         initialMessages={messages}

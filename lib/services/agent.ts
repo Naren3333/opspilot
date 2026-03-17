@@ -4,12 +4,14 @@ import {
   createAgentRun,
   createApprovalsForRun,
   createConversation,
+  getConversationById,
   getConversationMessages,
   getDocumentsByIds,
   getProviderSettings,
   getWorkspaceSnapshot,
   listTickets,
   searchKnowledgeBase,
+  updateConversationContext,
   updateAgentRun,
 } from "@/lib/data/repository";
 import { getModelProvider } from "@/lib/providers";
@@ -154,16 +156,19 @@ export async function initializeChatRun(request: ChatRequest) {
     throw new Error("Workspace not found.");
   }
 
-  const selectedDocuments = await getDocumentsByIds(request.workspaceSlug, request.documentIds ?? []);
-  const mode = isReviewRequest(request.message, request.documentIds) ? "review" : "support";
+  const existingConversation = request.conversationId ? await getConversationById(request.conversationId) : null;
+  const resolvedDocumentIds = request.documentIds ?? existingConversation?.contextDocumentIds ?? [];
+  const selectedDocuments = await getDocumentsByIds(request.workspaceSlug, resolvedDocumentIds);
+  const mode = isReviewRequest(request.message, resolvedDocumentIds) ? "review" : "support";
   const conversation =
-    (request.conversationId
-      ? snapshot.conversations.find((item) => item.id === request.conversationId)
-      : null) ??
-    (await createConversation(
-      request.workspaceSlug,
-      buildConversationTitle(request.message, selectedDocuments),
-    ));
+    existingConversation ??
+    (await createConversation(request.workspaceSlug, buildConversationTitle(request.message, selectedDocuments), {
+      contextDocumentIds: resolvedDocumentIds,
+    }));
+
+  if (existingConversation) {
+    await updateConversationContext(existingConversation.id, resolvedDocumentIds);
+  }
 
   await appendMessage({
     conversationId: conversation.id,
@@ -174,7 +179,7 @@ export async function initializeChatRun(request: ChatRequest) {
 
   const citations = (
     await searchKnowledgeBase(request.workspaceSlug, request.message, {
-      documentIds: request.documentIds,
+      documentIds: resolvedDocumentIds,
     })
   ).map((item) => item.citation);
 

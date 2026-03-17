@@ -9,8 +9,8 @@ import {
   FileCode2,
   LoaderCircle,
   MessageSquarePlus,
-  Paperclip,
   ShieldAlert,
+  Sparkles,
   Upload,
 } from "lucide-react";
 
@@ -21,10 +21,19 @@ interface ChatClientProps {
   workspaceSlug: string;
   initialConversationId: string | null;
   initialConversationTitle: string | null;
+  initialSelectedDocumentIds: string[];
   initialConversations: Conversation[];
   initialDocuments: DocumentRecord[];
   initialMessages: MessageRecord[];
   pendingApprovalCount: number;
+}
+
+interface ArtifactItem {
+  id: string;
+  label: string;
+  subtitle: string;
+  content: string;
+  kind: "evidence" | "file";
 }
 
 const FILE_ACCEPT =
@@ -42,24 +51,6 @@ function parseJsonLine(line: string) {
   };
 }
 
-function isCodeLikeDocument(document: DocumentRecord) {
-  const fileName = document.sourcePath ?? document.title;
-  return /\.(c|cpp|css|go|html|java|js|json|jsx|kt|md|mjs|php|py|rb|rs|sh|sql|swift|ts|tsx|txt|yaml|yml)$/i.test(
-    fileName,
-  );
-}
-
-function pickDefaultDocumentIds(documents: DocumentRecord[]) {
-  const candidates = documents.filter((document) => document.status === "indexed");
-  const codeFirst = candidates.filter(isCodeLikeDocument);
-  const selection = (codeFirst.length ? codeFirst : candidates).slice(0, 3);
-  return selection.map((document) => document.id);
-}
-
-function formatThreadTitle(title: string | null) {
-  return title ?? "New thread";
-}
-
 function buildReviewPrompt(selectedDocuments: DocumentRecord[]) {
   if (!selectedDocuments.length) {
     return "Review this like a senior engineer. Call out bugs, regressions, security risks, and missing tests first.";
@@ -73,10 +64,19 @@ function buildReviewPrompt(selectedDocuments: DocumentRecord[]) {
   return `Review the selected files (${names}) like a senior engineer. Call out bugs, regressions, security risks, and missing tests first.`;
 }
 
+function truncateArtifact(text: string, length = 2200) {
+  if (text.length <= length) {
+    return text;
+  }
+
+  return `${text.slice(0, length).trimEnd()}\n\n...`;
+}
+
 export function ChatClient({
   workspaceSlug,
   initialConversationId,
   initialConversationTitle,
+  initialSelectedDocumentIds,
   initialConversations,
   initialDocuments,
   initialMessages,
@@ -95,15 +95,16 @@ export function ChatClient({
   const [conversationTitle, setConversationTitle] = useState<string | null>(initialConversationTitle);
   const [conversations, setConversations] = useState(initialConversations);
   const [documents, setDocuments] = useState(initialDocuments);
-  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>(() =>
-    pickDefaultDocumentIds(initialDocuments),
-  );
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>(initialSelectedDocumentIds);
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
 
   useEffect(() => {
     setMessages(initialMessages);
     setConversationId(initialConversationId);
     setConversationTitle(initialConversationTitle);
-  }, [initialConversationId, initialConversationTitle, initialMessages]);
+    setSelectedDocumentIds(initialConversationId ? initialSelectedDocumentIds : []);
+    setPendingApprovals([]);
+  }, [initialConversationId, initialConversationTitle, initialMessages, initialSelectedDocumentIds]);
 
   useEffect(() => {
     setConversations(initialConversations);
@@ -112,9 +113,8 @@ export function ChatClient({
   useEffect(() => {
     setDocuments(initialDocuments);
     setSelectedDocumentIds((current) => {
-      const currentIds = new Set(initialDocuments.map((document) => document.id));
-      const filtered = current.filter((id) => currentIds.has(id));
-      return filtered.length ? filtered : pickDefaultDocumentIds(initialDocuments);
+      const validIds = new Set(initialDocuments.map((document) => document.id));
+      return current.filter((id) => validIds.has(id));
     });
   }, [initialDocuments]);
 
@@ -128,15 +128,62 @@ export function ChatClient({
     [documents, selectedDocumentIds],
   );
 
-  function syncConversationList(nextConversationId: string, nextTitle: string, updatedAt: string) {
+  const lastAssistantCitations = useMemo(
+    () => [...messages].reverse().find((message) => message.role === "assistant")?.citations ?? [],
+    [messages],
+  );
+
+  const artifacts = useMemo(() => {
+    const evidenceArtifacts: ArtifactItem[] = lastAssistantCitations.map((citation) => ({
+      id: `citation:${citation.id}`,
+      label: citation.label,
+      subtitle: "Evidence",
+      content: citation.excerpt,
+      kind: "evidence",
+    }));
+
+    const fileArtifacts: ArtifactItem[] = selectedDocuments.map((document) => ({
+      id: `document:${document.id}`,
+      label: document.sourcePath ?? document.title,
+      subtitle: "Thread context",
+      content: truncateArtifact(document.rawText),
+      kind: "file",
+    }));
+
+    return [...evidenceArtifacts, ...fileArtifacts];
+  }, [lastAssistantCitations, selectedDocuments]);
+
+  const activeArtifact = useMemo(
+    () => artifacts.find((artifact) => artifact.id === activeArtifactId) ?? artifacts[0] ?? null,
+    [activeArtifactId, artifacts],
+  );
+
+  useEffect(() => {
+    if (!artifacts.length) {
+      setActiveArtifactId(null);
+      return;
+    }
+
+    if (!activeArtifactId || !artifacts.some((artifact) => artifact.id === activeArtifactId)) {
+      setActiveArtifactId(artifacts[0].id);
+    }
+  }, [activeArtifactId, artifacts]);
+
+  function syncConversationList(
+    nextConversationId: string,
+    nextTitle: string,
+    updatedAt: string,
+    contextDocumentIds: string[],
+  ) {
     setConversations((current) => {
       const existing = current.find((conversation) => conversation.id === nextConversationId);
       const nextConversation: Conversation = existing
-        ? { ...existing, title: nextTitle, updatedAt }
+        ? { ...existing, title: nextTitle, contextDocumentIds, updatedAt }
         : {
             id: nextConversationId,
             workspaceId: workspaceSlug,
             title: nextTitle,
+            contextDocumentIds,
             createdAt: updatedAt,
             updatedAt,
           };
@@ -148,9 +195,37 @@ export function ChatClient({
     });
   }
 
+  async function persistThreadContext(nextIds: string[], targetConversationId = conversationId) {
+    if (!targetConversationId) {
+      return;
+    }
+
+    const response = await fetch(`/api/conversations/${targetConversationId}/context`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        workspaceSlug,
+        documentIds: nextIds,
+      }),
+    });
+
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(payload?.error ?? "Failed to save thread context.");
+    }
+
+    syncConversationList(
+      targetConversationId,
+      conversationTitle ?? "New thread",
+      new Date().toISOString(),
+      nextIds,
+    );
+  }
+
   async function streamMessage(messageOverride?: string) {
-    const fallbackPrompt = buildReviewPrompt(selectedDocuments);
-    const userText = (messageOverride ?? input).trim() || fallbackPrompt;
+    const userText = (messageOverride ?? input).trim() || buildReviewPrompt(selectedDocuments);
     if (busy) return;
 
     const startedAt = new Date().toISOString();
@@ -254,7 +329,13 @@ export function ChatClient({
             setPendingApprovals(entry.approvals ?? []);
 
             if (nextConversationId) {
-              syncConversationList(nextConversationId, nextConversationTitle, new Date().toISOString());
+              syncConversationList(
+                nextConversationId,
+                nextConversationTitle,
+                new Date().toISOString(),
+                selectedDocumentIds,
+              );
+
               if (!conversationId) {
                 router.replace(`/w/${workspaceSlug}/chat?conversation=${nextConversationId}`);
               }
@@ -337,22 +418,20 @@ export function ChatClient({
         ];
         return merged.sort((left, right) => (left.updatedAt < right.updatedAt ? 1 : -1));
       });
-      setSelectedDocumentIds((current) => [
-        ...new Set([...normalizedUploads.map((document) => document.id), ...current]),
-      ]);
+
+      const nextIds = [...new Set([...normalizedUploads.map((document) => document.id), ...selectedDocumentIds])];
+      setSelectedDocumentIds(nextIds);
       setUploadStatus(`Indexed ${normalizedUploads.length} file${normalizedUploads.length === 1 ? "" : "s"}.`);
       form.reset();
+
+      if (conversationId) {
+        await persistThreadContext(nextIds, conversationId);
+      }
     } catch (uploadError) {
       setUploadStatus(uploadError instanceof Error ? uploadError.message : "Upload failed.");
     } finally {
       setUploadBusy(false);
     }
-  }
-
-  function toggleDocument(documentId: string) {
-    setSelectedDocumentIds((current) =>
-      current.includes(documentId) ? current.filter((id) => id !== documentId) : [documentId, ...current],
-    );
   }
 
   function handleNewThread() {
@@ -362,12 +441,34 @@ export function ChatClient({
     setPendingApprovals([]);
     setError(null);
     setInput("");
+    setSelectedDocumentIds([]);
+    setUploadStatus(null);
     router.replace(`/w/${workspaceSlug}/chat`);
   }
 
+  function selectThread(nextConversation: Conversation) {
+    router.push(`/w/${workspaceSlug}/chat?conversation=${nextConversation.id}`);
+  }
+
+  async function toggleDocument(documentId: string) {
+    const nextIds = selectedDocumentIds.includes(documentId)
+      ? selectedDocumentIds.filter((id) => id !== documentId)
+      : [...selectedDocumentIds, documentId];
+
+    setSelectedDocumentIds(nextIds);
+
+    try {
+      if (conversationId) {
+        await persistThreadContext(nextIds, conversationId);
+      }
+    } catch (persistError) {
+      setError(persistError instanceof Error ? persistError.message : "Failed to save thread context.");
+    }
+  }
+
   return (
-    <div className="grid gap-4 xl:grid-cols-[16rem_minmax(0,1fr)]">
-      <aside className="grid h-[calc(100vh-2rem)] min-h-[44rem] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border border-[var(--line)] bg-[rgba(10,12,18,0.94)]">
+    <div className="grid gap-4 xl:grid-cols-[16rem_minmax(0,1fr)_25rem]">
+      <aside className="grid h-[calc(100vh-2rem)] min-h-[44rem] grid-rows-[auto_1fr] overflow-hidden rounded-[1.35rem] border border-[var(--line)] bg-[rgba(10,12,18,0.94)]">
         <div className="border-b border-[var(--line)] p-3">
           <button
             type="button"
@@ -385,7 +486,7 @@ export function ChatClient({
               <button
                 key={conversation.id}
                 type="button"
-                onClick={() => router.push(`/w/${workspaceSlug}/chat?conversation=${conversation.id}`)}
+                onClick={() => selectThread(conversation)}
                 className={cn(
                   "w-full rounded-xl px-3 py-2.5 text-left transition",
                   conversation.id === conversationId
@@ -395,56 +496,14 @@ export function ChatClient({
               >
                 <p className="truncate text-sm font-medium">{conversation.title}</p>
                 <p className="mt-1 text-xs text-[var(--muted)]">{formatRelativeTime(conversation.updatedAt)}</p>
+                {conversation.contextDocumentIds.length ? (
+                  <p className="mt-2 text-[11px] text-[var(--muted)]">
+                    {conversation.contextDocumentIds.length} file
+                    {conversation.contextDocumentIds.length === 1 ? "" : "s"}
+                  </p>
+                ) : null}
               </button>
             ))}
-          </div>
-        </div>
-
-        <div className="border-t border-[var(--line)] p-3">
-          <form onSubmit={handleUpload} className="space-y-2">
-            <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
-              <Paperclip size={14} />
-              Files
-            </label>
-            <input
-              name="files"
-              type="file"
-              multiple
-              accept={FILE_ACCEPT}
-              className="w-full rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-sm text-[var(--muted)]"
-            />
-            <button
-              type="submit"
-              disabled={uploadBusy}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm text-[var(--foreground)] transition hover:bg-[rgba(255,255,255,0.04)] disabled:opacity-60"
-            >
-              {uploadBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Upload size={16} />}
-              {uploadBusy ? "Uploading" : "Add files"}
-            </button>
-          </form>
-
-          {uploadStatus ? <p className="mt-2 text-xs text-[var(--muted)]">{uploadStatus}</p> : null}
-
-          <div className="mt-3 max-h-44 space-y-1 overflow-y-auto">
-            {documents.map((document) => {
-              const selected = selectedDocumentIds.includes(document.id);
-              return (
-                <button
-                  key={document.id}
-                  type="button"
-                  onClick={() => toggleDocument(document.id)}
-                  className={cn(
-                    "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition",
-                    selected
-                      ? "bg-[rgba(255,255,255,0.06)] text-[var(--foreground)]"
-                      : "text-[var(--muted)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--foreground)]",
-                  )}
-                >
-                  {selected ? <Check size={14} /> : <FileCode2 size={14} />}
-                  <span className="truncate">{document.sourcePath ?? document.title}</span>
-                </button>
-              );
-            })}
           </div>
         </div>
       </aside>
@@ -454,7 +513,7 @@ export function ChatClient({
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">Review</h1>
-              <p className="mt-1 truncate text-sm text-[var(--muted)]">{formatThreadTitle(conversationTitle)}</p>
+              <p className="mt-1 truncate text-sm text-[var(--muted)]">{conversationTitle ?? "New thread"}</p>
             </div>
             <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
               {selectedDocuments.length ? (
@@ -477,7 +536,7 @@ export function ChatClient({
               <div className="max-w-2xl">
                 <p className="text-base font-medium text-[var(--foreground)]">Drop files and start reviewing.</p>
                 <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
-                  Upload files from the left, keep the ones you want selected, then send a prompt or just hit send.
+                  Each thread keeps its own file context now. Pick files on the right, then ask for a review.
                 </p>
               </div>
             ) : null}
@@ -485,10 +544,10 @@ export function ChatClient({
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={cn("space-y-3", message.role === "user" ? "ml-auto max-w-xl" : "max-w-3xl")}
+                className={cn("space-y-3", message.role === "user" ? "ml-auto max-w-2xl" : "max-w-4xl")}
               >
                 <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
-                  {message.role === "assistant" ? <Bot size={14} /> : <ArrowUp size={14} />}
+                  {message.role === "assistant" ? <Bot size={14} /> : <Sparkles size={14} />}
                   <span>{message.role}</span>
                   <span>{formatRelativeTime(message.createdAt)}</span>
                 </div>
@@ -505,15 +564,16 @@ export function ChatClient({
                 </div>
 
                 {message.citations.length > 0 ? (
-                  <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
                     {message.citations.map((citation) => (
-                      <div
+                      <button
                         key={citation.id}
-                        className="rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-3 py-2"
+                        type="button"
+                        onClick={() => setActiveArtifactId(`citation:${citation.id}`)}
+                        className="rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.03)] px-3 py-1 text-xs text-[var(--foreground)] transition hover:bg-[rgba(255,255,255,0.06)]"
                       >
-                        <p className="text-xs font-medium text-[var(--foreground)]">{citation.label}</p>
-                        <p className="mt-1 text-xs leading-6 text-[var(--muted)]">{citation.excerpt}</p>
-                      </div>
+                        {citation.label}
+                      </button>
                     ))}
                   </div>
                 ) : null}
@@ -521,7 +581,7 @@ export function ChatClient({
             ))}
 
             {pendingApprovals.length ? (
-              <div className="max-w-3xl rounded-2xl border border-[rgba(255,194,107,0.18)] bg-[rgba(255,194,107,0.06)] px-4 py-3">
+              <div className="max-w-4xl rounded-2xl border border-[rgba(255,194,107,0.18)] bg-[rgba(255,194,107,0.06)] px-4 py-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
                   <ShieldAlert size={16} className="text-[var(--warning)]" />
                   Pending actions
@@ -542,12 +602,14 @@ export function ChatClient({
           {selectedDocuments.length ? (
             <div className="mb-3 flex flex-wrap gap-2">
               {selectedDocuments.map((document) => (
-                <span
+                <button
                   key={document.id}
+                  type="button"
+                  onClick={() => setActiveArtifactId(`document:${document.id}`)}
                   className="rounded-full bg-[rgba(255,255,255,0.06)] px-3 py-1 text-xs text-[var(--foreground)]"
                 >
                   {document.sourcePath ?? document.title}
-                </span>
+                </button>
               ))}
             </div>
           ) : null}
@@ -570,7 +632,7 @@ export function ChatClient({
             <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--line)] pt-3">
               <p className="text-xs text-[var(--muted)]">
                 {selectedDocuments.length
-                  ? `${selectedDocuments.length} file(s) in context`
+                  ? `${selectedDocuments.length} file(s) in this thread`
                   : "No files selected"}
               </p>
               <button
@@ -586,6 +648,125 @@ export function ChatClient({
           {error ? <p className="mt-3 text-sm text-[var(--danger)]">{error}</p> : null}
         </div>
       </section>
+
+      <aside className="grid h-[calc(100vh-2rem)] min-h-[44rem] grid-rows-[auto_auto_1fr] gap-4">
+        <section className="rounded-[1.35rem] border border-[var(--line)] bg-[rgba(10,12,18,0.94)] p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
+            <Upload size={16} />
+            Add files
+          </div>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            Files you add here become available for this thread. Selected files are saved with the thread.
+          </p>
+
+          <form onSubmit={handleUpload} className="mt-4 space-y-3">
+            <input
+              name="files"
+              type="file"
+              multiple
+              accept={FILE_ACCEPT}
+              className="w-full rounded-2xl border border-dashed border-[var(--line)] bg-[rgba(255,255,255,0.03)] px-4 py-4 text-sm text-[var(--muted)]"
+            />
+            <button
+              type="submit"
+              disabled={uploadBusy}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--line)] px-4 py-3 text-sm text-[var(--foreground)] transition hover:bg-[rgba(255,255,255,0.04)] disabled:opacity-60"
+            >
+              {uploadBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Upload size={16} />}
+              {uploadBusy ? "Uploading" : "Upload files"}
+            </button>
+          </form>
+
+          {uploadStatus ? <p className="mt-3 text-sm text-[var(--muted)]">{uploadStatus}</p> : null}
+        </section>
+
+        <section className="overflow-hidden rounded-[1.35rem] border border-[var(--line)] bg-[rgba(10,12,18,0.94)]">
+          <div className="border-b border-[var(--line)] px-4 py-3">
+            <p className="text-sm font-medium text-[var(--foreground)]">Thread context</p>
+          </div>
+          <div className="max-h-64 space-y-2 overflow-y-auto p-4">
+            {documents.map((document) => {
+              const selected = selectedDocumentIds.includes(document.id);
+              return (
+                <button
+                  key={document.id}
+                  type="button"
+                  onClick={() => void toggleDocument(document.id)}
+                  className={cn(
+                    "flex w-full items-start gap-3 rounded-xl border px-3 py-3 text-left transition",
+                    selected
+                      ? "border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)]"
+                      : "border-[var(--line)] bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.04)]",
+                  )}
+                >
+                  <span className="mt-0.5 text-[var(--foreground)]">
+                    {selected ? <Check size={15} /> : <FileCode2 size={15} />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium text-[var(--foreground)]">
+                      {document.sourcePath ?? document.title}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--muted)]">{document.summary}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="overflow-hidden rounded-[1.35rem] border border-[var(--line)] bg-[rgba(10,12,18,0.94)]">
+          <div className="border-b border-[var(--line)] px-4 py-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
+              <Sparkles size={16} />
+              Artifacts
+            </div>
+          </div>
+
+          <div className="border-b border-[var(--line)] px-4 py-3">
+            <div className="flex flex-wrap gap-2">
+              {artifacts.length ? (
+                artifacts.map((artifact) => (
+                  <button
+                    key={artifact.id}
+                    type="button"
+                    onClick={() => setActiveArtifactId(artifact.id)}
+                    className={cn(
+                      "rounded-full px-3 py-1 text-xs transition",
+                      activeArtifact?.id === artifact.id
+                        ? "bg-[rgba(255,255,255,0.12)] text-[var(--foreground)]"
+                        : "bg-[rgba(255,255,255,0.04)] text-[var(--muted)] hover:text-[var(--foreground)]",
+                    )}
+                  >
+                    {artifact.label}
+                  </button>
+                ))
+              ) : (
+                <p className="text-sm text-[var(--muted)]">Artifacts from citations and thread files will show here.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="h-full overflow-y-auto p-4">
+            {activeArtifact ? (
+              <div className="space-y-3">
+                <div>
+                  <p className="text-sm font-medium text-[var(--foreground)]">{activeArtifact.label}</p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
+                    {activeArtifact.subtitle}
+                  </p>
+                </div>
+                <pre className="overflow-x-auto rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.02)] p-4 font-mono text-xs leading-6 text-[var(--foreground)] whitespace-pre-wrap">
+                  {activeArtifact.content}
+                </pre>
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">
+                Run a review or select files to populate the artifact pane.
+              </p>
+            )}
+          </div>
+        </section>
+      </aside>
     </div>
   );
 }

@@ -92,6 +92,7 @@ export interface Conversation {
   id: string;
   workspaceId: string;
   title: string;
+  contextDocumentIds: string[];
   createdAt: string;
   updatedAt: string;
 }

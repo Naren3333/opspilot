@@ -211,6 +211,11 @@ export async function listConversations(slug: string) {
   return [...(snapshot?.conversations ?? [])].sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
 }
 
+export async function getConversationById(conversationId: string) {
+  const snapshot = getSnapshot();
+  return snapshot.conversations.find((conversation) => conversation.id === conversationId) ?? null;
+}
+
 export async function getConversationMessages(conversationId: string) {
   const snapshot = getSnapshot();
   return snapshot.messages
@@ -218,7 +223,13 @@ export async function getConversationMessages(conversationId: string) {
     .sort((a, b) => (a.createdAt > b.createdAt ? 1 : -1));
 }
 
-export async function createConversation(slug: string, title: string) {
+export async function createConversation(
+  slug: string,
+  title: string,
+  options?: {
+    contextDocumentIds?: string[];
+  },
+) {
   const snapshot = await getWorkspaceSnapshot(slug);
   if (!snapshot) {
     throw new Error("Workspace not found.");
@@ -228,11 +239,24 @@ export async function createConversation(slug: string, title: string) {
     id: createId("conversation"),
     workspaceId: snapshot.workspace.id,
     title,
+    contextDocumentIds: options?.contextDocumentIds ?? [],
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
 
   snapshot.conversations.unshift(conversation);
+  return conversation;
+}
+
+export async function updateConversationContext(conversationId: string, documentIds: string[]) {
+  const snapshot = getSnapshot();
+  const conversation = snapshot.conversations.find((item) => item.id === conversationId);
+  if (!conversation) {
+    return null;
+  }
+
+  conversation.contextDocumentIds = [...new Set(documentIds)];
+  conversation.updatedAt = nowIso();
   return conversation;
 }
 
