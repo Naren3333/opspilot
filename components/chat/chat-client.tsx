@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  ArrowUp,
   Bot,
+  Check,
   FileCode2,
-  FileSearch,
-  History,
   LoaderCircle,
   MessageSquarePlus,
-  Play,
+  Paperclip,
   ShieldAlert,
   Upload,
 } from "lucide-react";
@@ -57,16 +57,12 @@ function pickDefaultDocumentIds(documents: DocumentRecord[]) {
 }
 
 function formatThreadTitle(title: string | null) {
-  if (!title) {
-    return "New review thread";
-  }
-
-  return title;
+  return title ?? "New thread";
 }
 
 function buildReviewPrompt(selectedDocuments: DocumentRecord[]) {
   if (!selectedDocuments.length) {
-    return "Review the current thread like a senior engineer. Call out bugs, regressions, security risks, and missing tests first.";
+    return "Review this like a senior engineer. Call out bugs, regressions, security risks, and missing tests first.";
   }
 
   const names = selectedDocuments
@@ -132,11 +128,6 @@ export function ChatClient({
     [documents, selectedDocumentIds],
   );
 
-  const lastAssistantCitations = useMemo(
-    () => [...messages].reverse().find((message) => message.role === "assistant")?.citations ?? [],
-    [messages],
-  );
-
   function syncConversationList(nextConversationId: string, nextTitle: string, updatedAt: string) {
     setConversations((current) => {
       const existing = current.find((conversation) => conversation.id === nextConversationId);
@@ -158,8 +149,9 @@ export function ChatClient({
   }
 
   async function streamMessage(messageOverride?: string) {
-    const userText = (messageOverride ?? input).trim();
-    if (!userText || busy) return;
+    const fallbackPrompt = buildReviewPrompt(selectedDocuments);
+    const userText = (messageOverride ?? input).trim() || fallbackPrompt;
+    if (busy) return;
 
     const startedAt = new Date().toISOString();
     setBusy(true);
@@ -211,7 +203,7 @@ export function ChatClient({
       const decoder = new TextDecoder();
       let buffer = "";
       let nextConversationId = conversationId;
-      let nextConversationTitle = conversationTitle ?? "New review thread";
+      let nextConversationTitle = conversationTitle ?? "New thread";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -248,7 +240,11 @@ export function ChatClient({
             setMessages((current) =>
               current.map((message, index) =>
                 index === current.length - 1 && message.role === "assistant"
-                  ? { ...message, conversationId: nextConversationId ?? message.conversationId, citations: entry.citations ?? [] }
+                  ? {
+                      ...message,
+                      conversationId: nextConversationId ?? message.conversationId,
+                      citations: entry.citations ?? [],
+                    }
                   : message.role === "user" && index === current.length - 2
                     ? { ...message, conversationId: nextConversationId ?? message.conversationId }
                     : message,
@@ -287,12 +283,12 @@ export function ChatClient({
     const form = event.currentTarget;
     const fileInput = form.elements.namedItem("files");
     if (!(fileInput instanceof HTMLInputElement) || !fileInput.files?.length) {
-      setUploadStatus("Choose one or more files first.");
+      setUploadStatus("Choose file(s) first.");
       return;
     }
 
     setUploadBusy(true);
-    setUploadStatus("Uploading files into the review workspace...");
+    setUploadStatus("Uploading...");
     setError(null);
 
     try {
@@ -335,13 +331,16 @@ export function ChatClient({
       }));
 
       setDocuments((current) => {
-        const merged = [...normalizedUploads, ...current.filter((document) => !normalizedUploads.some((item) => item.id === document.id))];
+        const merged = [
+          ...normalizedUploads,
+          ...current.filter((document) => !normalizedUploads.some((item) => item.id === document.id)),
+        ];
         return merged.sort((left, right) => (left.updatedAt < right.updatedAt ? 1 : -1));
       });
       setSelectedDocumentIds((current) => [
         ...new Set([...normalizedUploads.map((document) => document.id), ...current]),
       ]);
-      setUploadStatus(`Indexed ${normalizedUploads.length} file${normalizedUploads.length === 1 ? "" : "s"} for review.`);
+      setUploadStatus(`Indexed ${normalizedUploads.length} file${normalizedUploads.length === 1 ? "" : "s"}.`);
       form.reset();
     } catch (uploadError) {
       setUploadStatus(uploadError instanceof Error ? uploadError.message : "Upload failed.");
@@ -363,125 +362,122 @@ export function ChatClient({
     setPendingApprovals([]);
     setError(null);
     setInput("");
+    router.replace(`/w/${workspaceSlug}/chat`);
   }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[17rem_minmax(0,1fr)_22rem]">
-      <aside className="grid gap-4">
-        <section className="rounded-[1.8rem] border border-[var(--line)] bg-[linear-gradient(180deg,rgba(11,15,23,0.98),rgba(7,10,17,0.96))] p-4 shadow-[var(--shadow)]">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--muted)]">
-                Review threads
-              </p>
-              <p className="mt-2 text-sm text-[var(--muted)]">Keep each file pass in its own history.</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleNewThread}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.04)] text-[var(--foreground)] transition hover:border-[var(--accent)] hover:text-[var(--accent)]"
-            >
-              <MessageSquarePlus size={18} />
-            </button>
-          </div>
+    <div className="grid gap-4 xl:grid-cols-[16rem_minmax(0,1fr)]">
+      <aside className="grid h-[calc(100vh-2rem)] min-h-[44rem] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border border-[var(--line)] bg-[rgba(10,12,18,0.94)]">
+        <div className="border-b border-[var(--line)] p-3">
+          <button
+            type="button"
+            onClick={handleNewThread}
+            className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-[var(--foreground)] transition hover:bg-[rgba(255,255,255,0.04)]"
+          >
+            <MessageSquarePlus size={16} />
+            New thread
+          </button>
+        </div>
 
-          <div className="mt-4 space-y-2">
-            <button
-              type="button"
-              onClick={handleNewThread}
-              className={cn(
-                "w-full rounded-[1.3rem] border px-3 py-3 text-left transition",
-                conversationId === null
-                  ? "border-[rgba(129,180,255,0.28)] bg-[rgba(129,180,255,0.12)]"
-                  : "border-transparent bg-[rgba(255,255,255,0.03)] hover:border-[var(--line)]",
-              )}
-            >
-              <p className="flex items-center gap-2 text-sm font-medium">
-                <History size={15} className="text-[var(--accent)]" />
-                New review thread
-              </p>
-              <p className="mt-2 text-xs text-[var(--muted)]">Start fresh and upload a new file set.</p>
-            </button>
-
+        <div className="overflow-y-auto p-3">
+          <div className="space-y-1">
             {conversations.map((conversation) => (
               <button
                 key={conversation.id}
                 type="button"
                 onClick={() => router.push(`/w/${workspaceSlug}/chat?conversation=${conversation.id}`)}
                 className={cn(
-                  "w-full rounded-[1.3rem] border px-3 py-3 text-left transition",
+                  "w-full rounded-xl px-3 py-2.5 text-left transition",
                   conversation.id === conversationId
-                    ? "border-[rgba(133,247,217,0.24)] bg-[rgba(133,247,217,0.1)]"
-                    : "border-transparent bg-[rgba(255,255,255,0.03)] hover:border-[var(--line)]",
+                    ? "bg-[rgba(255,255,255,0.06)] text-[var(--foreground)]"
+                    : "text-[var(--muted)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--foreground)]",
                 )}
               >
-                <p className="truncate text-sm font-medium text-[var(--foreground)]">{conversation.title}</p>
-                <p className="mt-2 text-xs text-[var(--muted)]">{formatRelativeTime(conversation.updatedAt)}</p>
+                <p className="truncate text-sm font-medium">{conversation.title}</p>
+                <p className="mt-1 text-xs text-[var(--muted)]">{formatRelativeTime(conversation.updatedAt)}</p>
               </button>
             ))}
           </div>
-        </section>
+        </div>
 
-        <section className="rounded-[1.8rem] border border-[var(--line)] bg-[linear-gradient(180deg,rgba(11,15,23,0.98),rgba(7,10,17,0.96))] p-4 shadow-[var(--shadow)]">
-          <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--muted)]">Quick runs</p>
-          <div className="mt-4 space-y-2">
-            {[
-              "Review the selected files like a senior engineer. Call out bugs, regressions, security risks, and missing tests first.",
-              "Summarize the architecture and the most fragile parts of the selected files.",
-              "List the tests I should write before merging these files.",
-            ].map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                onClick={() => setInput(prompt)}
-                className="w-full rounded-[1.2rem] border border-transparent bg-[rgba(255,255,255,0.03)] px-3 py-3 text-left text-sm text-[var(--muted)] transition hover:border-[var(--line)] hover:text-[var(--foreground)]"
-              >
-                {prompt}
-              </button>
-            ))}
+        <div className="border-t border-[var(--line)] p-3">
+          <form onSubmit={handleUpload} className="space-y-2">
+            <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-[var(--muted)]">
+              <Paperclip size={14} />
+              Files
+            </label>
+            <input
+              name="files"
+              type="file"
+              multiple
+              accept={FILE_ACCEPT}
+              className="w-full rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.03)] px-3 py-2 text-sm text-[var(--muted)]"
+            />
+            <button
+              type="submit"
+              disabled={uploadBusy}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--line)] px-3 py-2 text-sm text-[var(--foreground)] transition hover:bg-[rgba(255,255,255,0.04)] disabled:opacity-60"
+            >
+              {uploadBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Upload size={16} />}
+              {uploadBusy ? "Uploading" : "Add files"}
+            </button>
+          </form>
+
+          {uploadStatus ? <p className="mt-2 text-xs text-[var(--muted)]">{uploadStatus}</p> : null}
+
+          <div className="mt-3 max-h-44 space-y-1 overflow-y-auto">
+            {documents.map((document) => {
+              const selected = selectedDocumentIds.includes(document.id);
+              return (
+                <button
+                  key={document.id}
+                  type="button"
+                  onClick={() => toggleDocument(document.id)}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition",
+                    selected
+                      ? "bg-[rgba(255,255,255,0.06)] text-[var(--foreground)]"
+                      : "text-[var(--muted)] hover:bg-[rgba(255,255,255,0.03)] hover:text-[var(--foreground)]",
+                  )}
+                >
+                  {selected ? <Check size={14} /> : <FileCode2 size={14} />}
+                  <span className="truncate">{document.sourcePath ?? document.title}</span>
+                </button>
+              );
+            })}
           </div>
-        </section>
+        </div>
       </aside>
 
-      <section className="grid h-[82vh] min-h-[44rem] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.9rem] border border-[var(--line)] bg-[linear-gradient(180deg,rgba(10,13,21,0.99),rgba(5,8,13,0.96))] shadow-[0_30px_80px_rgba(0,0,0,0.42)]">
-        <div className="border-b border-[var(--line)] px-5 py-4 md:px-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--muted)]">
-                {conversationId ? "Active thread" : "Draft thread"}
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight">
-                {formatThreadTitle(conversationTitle)}
-              </h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Submit files, keep the context pinned, and let the agent review like a teammate.
-              </p>
+      <section className="grid h-[calc(100vh-2rem)] min-h-[44rem] grid-rows-[auto_1fr_auto] overflow-hidden rounded-[1.35rem] border border-[var(--line)] bg-[rgba(10,12,18,0.94)]">
+        <div className="border-b border-[var(--line)] px-5 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold tracking-tight text-[var(--foreground)]">Review</h1>
+              <p className="mt-1 truncate text-sm text-[var(--muted)]">{formatThreadTitle(conversationTitle)}</p>
             </div>
-
-            <div className="grid gap-2 sm:grid-cols-3">
-              <div className="rounded-[1.2rem] border border-[var(--line)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">Pinned files</p>
-                <p className="mt-2 text-lg font-semibold">{selectedDocuments.length}</p>
-              </div>
-              <div className="rounded-[1.2rem] border border-[var(--line)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">History</p>
-                <p className="mt-2 text-lg font-semibold">{messages.length}</p>
-              </div>
-              <div className="rounded-[1.2rem] border border-[var(--line)] bg-[rgba(255,255,255,0.03)] px-4 py-3">
-                <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-[var(--muted)]">Approvals</p>
-                <p className="mt-2 text-lg font-semibold">{pendingApprovalCount + pendingApprovals.length}</p>
-              </div>
+            <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
+              {selectedDocuments.length ? (
+                <span className="rounded-full bg-[rgba(255,255,255,0.06)] px-3 py-1">
+                  {selectedDocuments.length} file{selectedDocuments.length === 1 ? "" : "s"}
+                </span>
+              ) : null}
+              {pendingApprovalCount + pendingApprovals.length > 0 ? (
+                <span className="rounded-full bg-[rgba(255,194,107,0.12)] px-3 py-1 text-[var(--warning)]">
+                  {pendingApprovalCount + pendingApprovals.length} approvals
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
 
-        <div ref={scrollRef} className="overflow-y-auto px-5 py-5 md:px-6">
-          <div className="space-y-5">
+        <div ref={scrollRef} className="overflow-y-auto px-5 py-5">
+          <div className="space-y-6">
             {messages.length === 0 ? (
-              <div className="rounded-[1.6rem] border border-dashed border-[var(--line)] bg-[rgba(255,255,255,0.02)] p-6">
-                <p className="text-lg font-medium text-[var(--foreground)]">No messages yet.</p>
-                <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-                  Upload one or more files from the right rail, then click &quot;Run review&quot; or ask for a bug scan, PR pass, or test plan.
+              <div className="max-w-2xl">
+                <p className="text-base font-medium text-[var(--foreground)]">Drop files and start reviewing.</p>
+                <p className="mt-2 text-sm leading-7 text-[var(--muted)]">
+                  Upload files from the left, keep the ones you want selected, then send a prompt or just hit send.
                 </p>
               </div>
             ) : null}
@@ -489,57 +485,69 @@ export function ChatClient({
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={cn("flex", message.role === "user" ? "justify-end" : "justify-start")}
+                className={cn("space-y-3", message.role === "user" ? "ml-auto max-w-xl" : "max-w-3xl")}
               >
+                <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
+                  {message.role === "assistant" ? <Bot size={14} /> : <ArrowUp size={14} />}
+                  <span>{message.role}</span>
+                  <span>{formatRelativeTime(message.createdAt)}</span>
+                </div>
+
                 <div
                   className={cn(
-                    "max-w-[min(90%,54rem)] rounded-[1.6rem] border px-5 py-4 shadow-[0_18px_44px_rgba(0,0,0,0.26)]",
+                    "rounded-2xl border px-4 py-3 text-sm leading-7",
                     message.role === "user"
-                      ? "border-[rgba(129,180,255,0.22)] bg-[linear-gradient(180deg,rgba(20,29,43,0.98),rgba(11,18,30,0.94))]"
-                      : "border-[var(--line)] bg-[linear-gradient(180deg,rgba(13,17,26,0.98),rgba(8,11,18,0.96))]",
+                      ? "border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)]"
+                      : "border-[var(--line)] bg-[rgba(255,255,255,0.02)]",
                   )}
                 >
-                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-[0.24em] text-[var(--muted)]">
-                    {message.role === "assistant" ? <Bot size={14} /> : <FileSearch size={14} />}
-                    <span>{message.role}</span>
-                    <span>-</span>
-                    <span>{formatRelativeTime(message.createdAt)}</span>
-                  </div>
-
-                  <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-[var(--foreground)]">
-                    {message.content || "..."}
-                  </p>
-
-                  {message.citations.length > 0 ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {message.citations.map((citation) => (
-                        <span
-                          key={citation.id}
-                          className="rounded-full border border-[rgba(133,247,217,0.18)] bg-[rgba(133,247,217,0.08)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--accent)]"
-                        >
-                          {citation.label}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
+                  <p className="whitespace-pre-wrap text-[var(--foreground)]">{message.content || "..."}</p>
                 </div>
+
+                {message.citations.length > 0 ? (
+                  <div className="space-y-2">
+                    {message.citations.map((citation) => (
+                      <div
+                        key={citation.id}
+                        className="rounded-xl border border-[var(--line)] bg-[rgba(255,255,255,0.02)] px-3 py-2"
+                      >
+                        <p className="text-xs font-medium text-[var(--foreground)]">{citation.label}</p>
+                        <p className="mt-1 text-xs leading-6 text-[var(--muted)]">{citation.excerpt}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ))}
+
+            {pendingApprovals.length ? (
+              <div className="max-w-3xl rounded-2xl border border-[rgba(255,194,107,0.18)] bg-[rgba(255,194,107,0.06)] px-4 py-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
+                  <ShieldAlert size={16} className="text-[var(--warning)]" />
+                  Pending actions
+                </div>
+                <div className="mt-2 space-y-1">
+                  {pendingApprovals.map((approval) => (
+                    <p key={approval.id} className="text-sm text-[var(--muted)]">
+                      {approval.title}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
-        <div className="border-t border-[var(--line)] bg-[linear-gradient(180deg,rgba(11,14,21,0.98),rgba(6,8,14,0.98))] p-5 md:p-6">
+        <div className="border-t border-[var(--line)] p-4">
           {selectedDocuments.length ? (
             <div className="mb-3 flex flex-wrap gap-2">
               {selectedDocuments.map((document) => (
-                <button
+                <span
                   key={document.id}
-                  type="button"
-                  onClick={() => toggleDocument(document.id)}
-                  className="rounded-full border border-[rgba(129,180,255,0.22)] bg-[rgba(129,180,255,0.1)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)]"
+                  className="rounded-full bg-[rgba(255,255,255,0.06)] px-3 py-1 text-xs text-[var(--foreground)]"
                 >
                   {document.sourcePath ?? document.title}
-                </button>
+                </span>
               ))}
             </div>
           ) : null}
@@ -549,158 +557,35 @@ export function ChatClient({
               event.preventDefault();
               void streamMessage();
             }}
-            className="rounded-[1.5rem] border border-[var(--line)] bg-[rgba(255,255,255,0.03)] p-3"
+            className="rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.02)] p-3"
           >
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
               rows={4}
-              placeholder="Ask for a PR review, bug scan, architecture critique, or missing-test pass."
-              className="w-full resize-none rounded-[1.2rem] bg-transparent px-2 py-2 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
+              placeholder="Ask for a PR review, bug scan, or test plan."
+              className="w-full resize-none bg-transparent px-1 py-1 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
             />
 
-            <div className="mt-3 flex flex-col gap-3 border-t border-[var(--line)] pt-3 md:flex-row md:items-center md:justify-between">
-              <p className="text-sm text-[var(--muted)]">
-                Selected context: {selectedDocuments.length ? `${selectedDocuments.length} file(s)` : "no files pinned yet"}
+            <div className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--line)] pt-3">
+              <p className="text-xs text-[var(--muted)]">
+                {selectedDocuments.length
+                  ? `${selectedDocuments.length} file(s) in context`
+                  : "No files selected"}
               </p>
-
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <button
-                  type="button"
-                  onClick={() => void streamMessage(buildReviewPrompt(selectedDocuments))}
-                  disabled={busy}
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--accent)] disabled:opacity-60"
-                >
-                  <Play size={16} />
-                  Run review
-                </button>
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[linear-gradient(135deg,#b8d4ff,#7af5df)] px-5 py-3 text-sm font-semibold text-[#07131f] transition hover:shadow-[0_0_24px_rgba(122,245,223,0.2)] disabled:opacity-60"
-                >
-                  {busy ? <LoaderCircle size={16} className="animate-spin" /> : <Bot size={16} />}
-                  {busy ? "Reviewing..." : "Send to agent"}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={busy}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--foreground)] text-[var(--background)] transition disabled:opacity-60"
+              >
+                {busy ? <LoaderCircle size={16} className="animate-spin" /> : <ArrowUp size={16} />}
+              </button>
             </div>
           </form>
 
           {error ? <p className="mt-3 text-sm text-[var(--danger)]">{error}</p> : null}
         </div>
       </section>
-
-      <aside className="grid h-[82vh] min-h-[44rem] gap-4 xl:grid-rows-[auto_1fr_1fr]">
-        <section className="rounded-[1.8rem] border border-[var(--line)] bg-[linear-gradient(180deg,rgba(11,15,23,0.98),rgba(7,10,17,0.96))] p-4 shadow-[var(--shadow)]">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--muted)]">Submit files</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                Drop code, config, or docs here and pin them into the current review.
-              </p>
-            </div>
-            <Upload size={18} className="text-[var(--accent)]" />
-          </div>
-
-          <form onSubmit={handleUpload} className="mt-4 space-y-3">
-            <input
-              name="files"
-              type="file"
-              multiple
-              accept={FILE_ACCEPT}
-              className="w-full rounded-[1.2rem] border border-dashed border-[var(--line)] bg-[rgba(255,255,255,0.03)] px-4 py-4 text-sm text-[var(--muted)]"
-            />
-            <button
-              type="submit"
-              disabled={uploadBusy}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3 text-sm font-semibold text-[var(--foreground)] transition hover:border-[var(--accent)] disabled:opacity-60"
-            >
-              {uploadBusy ? <LoaderCircle size={16} className="animate-spin" /> : <Upload size={16} />}
-              {uploadBusy ? "Indexing files..." : "Upload to review workspace"}
-            </button>
-          </form>
-
-          {uploadStatus ? <p className="mt-3 text-sm text-[var(--muted)]">{uploadStatus}</p> : null}
-        </section>
-
-        <section className="overflow-hidden rounded-[1.8rem] border border-[var(--line)] bg-[linear-gradient(180deg,rgba(11,15,23,0.98),rgba(7,10,17,0.96))] shadow-[var(--shadow)]">
-          <div className="border-b border-[var(--line)] px-4 py-4">
-            <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--muted)]">Pinned context</p>
-          </div>
-          <div className="max-h-[calc(41vh-6rem)] space-y-3 overflow-y-auto px-4 py-4">
-            {documents.length ? (
-              documents.map((document) => {
-                const selected = selectedDocumentIds.includes(document.id);
-                return (
-                  <button
-                    key={document.id}
-                    type="button"
-                    onClick={() => toggleDocument(document.id)}
-                    className={cn(
-                      "w-full rounded-[1.25rem] border px-4 py-3 text-left transition",
-                      selected
-                        ? "border-[rgba(129,180,255,0.28)] bg-[rgba(129,180,255,0.1)]"
-                        : "border-[var(--line)] bg-[rgba(255,255,255,0.03)] hover:border-[rgba(129,180,255,0.18)]",
-                    )}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-sm font-medium text-[var(--foreground)]">
-                        {document.sourcePath ?? document.title}
-                      </p>
-                      <FileCode2 size={15} className={selected ? "text-[var(--accent)]" : "text-[var(--muted)]"} />
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-[var(--muted)]">{document.summary}</p>
-                    <p className="mt-2 text-[11px] uppercase tracking-[0.2em] text-[var(--muted)]">
-                      {document.status} • {formatRelativeTime(document.updatedAt)}
-                    </p>
-                  </button>
-                );
-              })
-            ) : (
-              <p className="px-1 text-sm text-[var(--muted)]">Uploaded files will appear here once indexed.</p>
-            )}
-          </div>
-        </section>
-
-        <section className="overflow-hidden rounded-[1.8rem] border border-[var(--line)] bg-[linear-gradient(180deg,rgba(11,15,23,0.98),rgba(7,10,17,0.96))] shadow-[var(--shadow)]">
-          <div className="border-b border-[var(--line)] px-4 py-4">
-            <p className="font-mono text-[11px] uppercase tracking-[0.32em] text-[var(--muted)]">Latest evidence</p>
-          </div>
-          <div className="max-h-[calc(41vh-6rem)] space-y-3 overflow-y-auto px-4 py-4">
-            {lastAssistantCitations.length ? (
-              lastAssistantCitations.map((citation) => (
-                <div
-                  key={citation.id}
-                  className="rounded-[1.25rem] border border-[var(--line)] bg-[rgba(255,255,255,0.03)] p-4"
-                >
-                  <p className="text-sm font-semibold text-[var(--foreground)]">{citation.label}</p>
-                  <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{citation.excerpt}</p>
-                </div>
-              ))
-            ) : (
-              <p className="px-1 text-sm text-[var(--muted)]">
-                Evidence snippets from the next assistant review will show up here.
-              </p>
-            )}
-
-            {pendingApprovals.length ? (
-              <div className="rounded-[1.25rem] border border-[rgba(255,194,107,0.22)] bg-[rgba(255,194,107,0.08)] p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--foreground)]">
-                  <ShieldAlert size={16} className="text-[var(--warning)]" />
-                  Action proposals
-                </div>
-                <div className="mt-3 space-y-2">
-                  {pendingApprovals.map((approval) => (
-                    <p key={approval.id} className="text-sm leading-6 text-[var(--muted)]">
-                      {approval.title}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </section>
-      </aside>
     </div>
   );
 }

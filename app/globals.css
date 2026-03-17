@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 :root {
-  --background: #05070c;
-  --foreground: #edf3fb;
-  --card: rgba(9, 12, 19, 0.82);
-  --card-strong: rgba(10, 14, 22, 0.96);
-  --muted: #8a96aa;
-  --line: rgba(146, 163, 190, 0.16);
-  --accent: #7af5df;
-  --accent-soft: rgba(122, 245, 223, 0.12);
-  --accent-ink: #06131a;
-  --secondary: #81b4ff;
-  --secondary-soft: rgba(129, 180, 255, 0.14);
+  --background: #0f1115;
+  --foreground: #f1f3f5;
+  --card: rgba(20, 23, 29, 0.9);
+  --card-strong: rgba(18, 21, 27, 0.98);
+  --muted: #9aa0aa;
+  --line: rgba(255, 255, 255, 0.08);
+  --accent: #f1f3f5;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --accent-ink: #0f1115;
+  --secondary: #c7ccd3;
+  --secondary-soft: rgba(255, 255, 255, 0.06);
   --success: #71f0a5;
   --warning: #ffc96b;
   --danger: #ff6d85;
-  --shadow: 0 28px 120px rgba(0, 0, 0, 0.42);
+  --shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
 }
 
 @theme inline {
@@ -36,11 +36,7 @@ html {
 body {
   position: relative;
   min-height: 100vh;
-  background:
-    radial-gradient(circle at top left, rgba(122, 245, 223, 0.12), transparent 24%),
-    radial-gradient(circle at 88% 12%, rgba(129, 180, 255, 0.14), transparent 28%),
-    radial-gradient(circle at 34% 120%, rgba(86, 113, 255, 0.09), transparent 24%),
-    linear-gradient(180deg, #070a11 0%, #020309 100%);
+  background: linear-gradient(180deg, #111318 0%, #0b0d11 100%);
   color: var(--foreground);
   font-family: var(--font-space-grotesk), sans-serif;
   overflow-x: hidden;
@@ -50,24 +46,14 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  background:
-    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
-  background-size: 58px 58px;
-  mask-image: radial-gradient(circle at center, black 22%, transparent 84%);
+  background: linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 48px;
   pointer-events: none;
-  opacity: 0.18;
+  opacity: 0.12;
 }
 
 body::after {
-  content: "";
-  position: fixed;
-  inset: auto -20vw -28vh auto;
-  width: 46vw;
-  height: 46vw;
-  background: radial-gradient(circle, rgba(129, 180, 255, 0.12), transparent 68%);
-  filter: blur(42px);
-  pointer-events: none;
+  display: none;
 }
 
 a {
@@ -83,7 +69,7 @@ select {
 }
 
 ::selection {
-  background: rgba(129, 180, 255, 0.24);
+  background: rgba(255, 255, 255, 0.22);
 }
 
 ::-webkit-scrollbar {
@@ -98,6 +84,6 @@ select {
 ::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(122, 245, 223, 0.42), rgba(129, 180, 255, 0.42));
+  background: rgba(255, 255, 255, 0.18);
   background-clip: padding-box;
 }

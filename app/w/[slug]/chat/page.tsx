@@ -1,9 +1,6 @@
 import { notFound } from "next/navigation";
 
 import { ChatClient } from "@/components/chat/chat-client";
-import { PageHeader } from "@/components/page-header";
-import { SectionCard } from "@/components/section-card";
-import { StatCard } from "@/components/stat-card";
 import {
   getConversationMessages,
   getWorkspaceSnapshot,
@@ -29,39 +26,9 @@ export default async function ChatPage({
     conversations.find((item) => item.id === requestedConversationId) ?? conversations[0] ?? null;
   const messages = activeConversation ? await getConversationMessages(activeConversation.id) : [];
   const pendingApprovals = snapshot.approvals.filter((item) => item.status === "pending").length;
-  const indexedReviewFiles = documents.filter((document) => document.status === "indexed").length;
 
   return (
-    <main className="space-y-6">
-      <SectionCard>
-        <PageHeader
-          eyebrow="Review console"
-          title="Codex-style file review"
-          description="Upload code or config files, keep each review in its own thread, and let the agent surface bugs, regressions, and missing tests with attached evidence."
-        />
-        <div className="mt-6 grid gap-4 md:grid-cols-3">
-          <StatCard
-            label="Threads"
-            value={String(conversations.length)}
-            hint={
-              activeConversation
-                ? `${messages.length} messages loaded into ${activeConversation.title}`
-                : "Start a new review thread to open a fresh chat history"
-            }
-          />
-          <StatCard
-            label="Indexed files"
-            value={String(indexedReviewFiles)}
-            hint="Any uploaded file can be pinned as review context for the current thread"
-          />
-          <StatCard
-            label="Provider"
-            value={snapshot.providerSettings.provider}
-            hint={`${snapshot.providerSettings.chatModel} is the active reviewer model`}
-          />
-        </div>
-      </SectionCard>
-
+    <main>
       <ChatClient
         workspaceSlug={slug}
         initialConversationId={activeConversation?.id ?? null}
