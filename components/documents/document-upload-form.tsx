@@ -50,18 +50,21 @@ export function DocumentUploadForm({ workspaceSlug }: { workspaceSlug: string })
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-[1.5rem] border border-dashed border-[var(--line)] p-5">
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-[1.5rem] border border-dashed border-[var(--line)] bg-[rgba(255,255,255,0.02)] p-5"
+    >
       <div className="flex flex-col gap-4 md:flex-row md:items-center">
         <input
           name="file"
           type="file"
           accept=".pdf,.md,.txt"
-          className="w-full rounded-2xl border border-[var(--line)] bg-[var(--background)] px-4 py-3"
+          className="w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3"
         />
         <button
           type="submit"
           disabled={busy}
-          className="rounded-full bg-[var(--foreground)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+          className="rounded-full bg-[linear-gradient(135deg,var(--accent),#56d8ff)] px-5 py-3 text-sm font-semibold text-[var(--accent-ink)] disabled:opacity-60"
         >
           {busy ? "Working..." : "Upload and index"}
         </button>

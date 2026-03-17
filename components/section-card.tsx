@@ -12,7 +12,7 @@ export function SectionCard({
   return (
     <section
       className={cn(
-        "rounded-[1.75rem] border border-[var(--line)] bg-white/75 p-6 shadow-[0_16px_42px_rgba(45,41,36,0.08)] backdrop-blur-sm",
+        "rounded-[1.75rem] border border-[var(--line)] bg-[linear-gradient(180deg,rgba(12,18,30,0.96),rgba(6,10,18,0.92))] p-6 shadow-[var(--shadow)] backdrop-blur-xl",
         className,
       )}
     >

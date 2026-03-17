@@ -24,7 +24,7 @@ export default function LoginPage() {
               "Trace and eval dashboards built into the shell",
               "Seeded documents and tickets for instant demos",
             ].map((item) => (
-              <div key={item} className="rounded-[1.5rem] border border-[var(--line)] bg-white/70 p-4">
+              <div key={item} className="rounded-[1.5rem] border border-[var(--line)] bg-[rgba(255,255,255,0.04)] p-4">
                 <p className="flex items-center gap-3 text-sm font-medium">
                   <ArrowRight size={16} className="text-[var(--accent)]" />
                   {item}

@@ -20,7 +20,7 @@ export default function OnboardingPage() {
               name="name"
               required
               placeholder="Northstar Support"
-              className="mt-2 w-full rounded-[1.5rem] border border-[var(--line)] bg-white/80 px-4 py-3"
+              className="mt-2 w-full rounded-[1.5rem] border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3"
             />
           </div>
           <div>
@@ -29,13 +29,13 @@ export default function OnboardingPage() {
               name="industry"
               required
               placeholder="B2B SaaS"
-              className="mt-2 w-full rounded-[1.5rem] border border-[var(--line)] bg-white/80 px-4 py-3"
+              className="mt-2 w-full rounded-[1.5rem] border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3"
             />
           </div>
           <div className="md:col-span-2">
             <button
               type="submit"
-              className="rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white"
+              className="rounded-full bg-[linear-gradient(135deg,var(--accent),#56d8ff)] px-5 py-3 text-sm font-semibold text-[var(--accent-ink)]"
             >
               Create workspace
             </button>

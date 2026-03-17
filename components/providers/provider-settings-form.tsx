@@ -11,7 +11,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+      className="rounded-full bg-[linear-gradient(135deg,var(--accent),#56d8ff)] px-5 py-3 text-sm font-semibold text-[var(--accent-ink)] disabled:opacity-60"
     >
       {pending ? "Saving..." : "Save provider settings"}
     </button>
@@ -32,7 +32,7 @@ export function ProviderSettingsForm({
         <select
           name="provider"
           defaultValue={settings.provider}
-          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[var(--background)] px-4 py-3"
+          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3"
         >
           <option value="mock">Mock / demo</option>
           <option value="ollama">Ollama</option>
@@ -44,7 +44,7 @@ export function ProviderSettingsForm({
         <input
           name="baseUrl"
           defaultValue={settings.baseUrl}
-          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[var(--background)] px-4 py-3"
+          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3"
         />
       </div>
       <div>
@@ -52,7 +52,7 @@ export function ProviderSettingsForm({
         <input
           name="chatModel"
           defaultValue={settings.chatModel}
-          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[var(--background)] px-4 py-3"
+          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3"
         />
       </div>
       <div>
@@ -60,7 +60,7 @@ export function ProviderSettingsForm({
         <input
           name="embeddingModel"
           defaultValue={settings.embeddingModel}
-          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[var(--background)] px-4 py-3"
+          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3"
         />
       </div>
       <div className="md:col-span-2">
@@ -69,7 +69,7 @@ export function ProviderSettingsForm({
           name="apiKey"
           type="password"
           placeholder={settings.hasApiKey ? "Stored securely. Enter to replace." : "Optional in demo mode"}
-          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[var(--background)] px-4 py-3"
+          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-3"
         />
       </div>
       <div className="md:col-span-2">

@@ -24,7 +24,7 @@ export function EvalRunner({ workspaceSlug, caseId }: { workspaceSlug: string; c
     <button
       onClick={runEval}
       disabled={busy}
-      className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold disabled:opacity-60"
+      className="rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-4 py-2 text-sm font-semibold hover:border-[var(--accent)] disabled:opacity-60"
     >
       {busy ? "Running..." : "Run eval"}
     </button>

@@ -26,7 +26,7 @@ export default function Home() {
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-8 md:px-10">
       <header className="mb-12 flex items-center justify-between gap-4">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.32em] text-[var(--muted)]">
+          <p className="font-mono text-xs uppercase tracking-[0.36em] text-[var(--accent)]/80">
             OpsPilot v1
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight">Support ops, made inspectable.</h1>
@@ -34,13 +34,13 @@ export default function Home() {
         <div className="flex flex-wrap gap-3">
           <Link
             href="/login"
-            className="rounded-full border border-[var(--line)] bg-white/70 px-5 py-2.5 text-sm font-medium backdrop-blur-sm transition hover:border-[var(--accent)]"
+            className="rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-5 py-2.5 text-sm font-medium backdrop-blur-sm transition hover:border-[var(--accent)] hover:bg-[rgba(255,255,255,0.07)]"
           >
             Sign in
           </Link>
           <Link
             href={`/w/${env.demoWorkspaceSlug}/chat`}
-            className="rounded-full bg-[var(--foreground)] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--accent)]"
+            className="rounded-full bg-[linear-gradient(135deg,var(--accent),#56d8ff)] px-5 py-2.5 text-sm font-medium text-[var(--accent-ink)] transition hover:shadow-[0_0_24px_rgba(133,247,217,0.24)]"
           >
             Open demo workspace
           </Link>
@@ -48,7 +48,7 @@ export default function Home() {
       </header>
 
       <section className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
-        <div className="rounded-[2rem] border border-[var(--line)] bg-[var(--card)] p-8 shadow-[var(--shadow)] backdrop-blur-sm md:p-10">
+        <div className="rounded-[2rem] border border-[var(--line)] bg-[radial-gradient(circle_at_top_left,rgba(133,247,217,0.14),transparent_46%),linear-gradient(180deg,rgba(11,18,30,0.96),rgba(6,10,18,0.92))] p-8 shadow-[var(--shadow)] backdrop-blur-sm md:p-10">
           <p className="inline-flex rounded-full border border-[var(--accent-soft)] bg-[var(--accent-soft)] px-4 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[var(--accent-ink)]">
             Recruiter-ready SaaS demo
           </p>
@@ -64,20 +64,20 @@ export default function Home() {
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
               href={`/w/${env.demoWorkspaceSlug}/chat`}
-              className="rounded-full bg-[var(--accent)] px-5 py-3 text-sm font-semibold text-white transition hover:translate-y-[-1px]"
+              className="rounded-full bg-[linear-gradient(135deg,var(--accent),#56d8ff)] px-5 py-3 text-sm font-semibold text-[var(--accent-ink)] transition hover:translate-y-[-1px]"
             >
               Explore the demo
             </Link>
             <Link
               href="/onboarding"
-              className="rounded-full border border-[var(--line)] bg-white/80 px-5 py-3 text-sm font-semibold transition hover:border-[var(--foreground)]"
+              className="rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.04)] px-5 py-3 text-sm font-semibold transition hover:border-[var(--accent)] hover:bg-[rgba(255,255,255,0.07)]"
             >
               Create a workspace
             </Link>
           </div>
         </div>
 
-        <div className="rounded-[2rem] border border-[var(--line)] bg-[var(--card-strong)] p-7 shadow-[var(--shadow)]">
+        <div className="rounded-[2rem] border border-[var(--line)] bg-[linear-gradient(180deg,rgba(11,18,30,0.96),rgba(6,10,18,0.92))] p-7 shadow-[var(--shadow)]">
           <p className="font-mono text-xs uppercase tracking-[0.24em] text-[var(--muted)]">
             What it proves
           </p>
@@ -102,7 +102,7 @@ export default function Home() {
         {highlights.map(({ title, body, icon: Icon }) => (
           <article
             key={title}
-            className="rounded-[1.75rem] border border-[var(--line)] bg-white/75 p-6 shadow-[0_18px_54px_rgba(45,41,36,0.08)] backdrop-blur-sm"
+            className="rounded-[1.75rem] border border-[var(--line)] bg-[linear-gradient(180deg,rgba(11,18,30,0.96),rgba(6,10,18,0.92))] p-6 shadow-[0_18px_54px_rgba(0,0,0,0.22)] backdrop-blur-sm"
           >
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--secondary-soft)] text-[var(--secondary)]">
               <Icon size={20} />
